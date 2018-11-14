@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation Drift Detection
+Parameters:
+  CloudToolsBucket:
+    Type: String
+    Description: Name of S3 bucket containing CloudTools scripts
+  Release:
+    Type: String
+    Description: Version of the solution deployed
+    Default: 0.0.0
+Resources:
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Effect: Allow
+            Sid: ''
+  LambdaRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: DetectDrift
+      Roles:
+        - !Ref 'LambdaRole'
+      PolicyDocument:
+        Statement:
+          - Sid: DetectDrift
+            Action:
+              - cloudformation:*Drift*
+              - cloudformation:ListStacks
+            Effect: Allow
+            Resource: '*'
