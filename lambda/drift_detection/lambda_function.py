@@ -1,6 +1,27 @@
 #!/usr/bin/env python3
 
 import boto3
+import re
+from botocore.exceptions import ClientError
+from datetime import datetime, timedelta, timezone
+from time import sleep
+
+ACTIVE_STACK_STATUS=[
+    'CREATE_IN_PROGRESS',
+    'CREATE_FAILED',
+    'CREATE_COMPLETE',
+    'ROLLBACK_IN_PROGRESS',
+    'ROLLBACK_FAILED',
+    'ROLLBACK_COMPLETE',
+    'UPDATE_IN_PROGRESS',
+    'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS',
+    'UPDATE_COMPLETE',
+    'UPDATE_ROLLBACK_IN_PROGRESS',
+    'UPDATE_ROLLBACK_FAILED',
+    'UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS',
+    'UPDATE_ROLLBACK_COMPLETE',
+    'REVIEW_IN_PROGRESS'
+]
 
 class DriftDetector(object):
     '''
@@ -8,7 +29,7 @@ class DriftDetector(object):
     on every stack and sends an SNS push for any resource not in sync.
 
     Attributes:
-        stacks  List of StackNames
+        stacks  List of Stack Objects
     '''
     stacks = []
 
@@ -16,12 +37,13 @@ class DriftDetector(object):
         session = self._setup_session(context)
         self.cfn_client = session.client('cloudformation')
         self.stacks = self._get_stacks()
+        self.detections = self.check_drift()
 
     def _get_stacks(self):
         '''
         Retreives all stacks in region
         '''
-        resp = self.cfn_client.list_stacks()
+        resp = self.cfn_client.list_stacks(StackStatusFilter=ACTIVE_STACK_STATUS)
         stacks = resp['StackSummaries']
         while stacks == None or 'NextToken' in resp.keys():
             resp = self.cfn_client.list_stacks(NextToken=resp['NextToken'])
@@ -45,11 +67,41 @@ class DriftDetector(object):
             # Sets up the session in lambda context
             return boto3.session.Session()
 
+    def check_drift(self,last_check_threshold=60):
+        '''
+        Checks every stack for drift
+        '''
+        detections = []
+        for stack in self.stacks:
+            resp = None
+            check_threshold = datetime.now(timezone.utc) - timedelta(seconds=last_check_threshold)
+            if stack['DriftInformation']['StackDriftStatus'] == 'NOT_CHECKED':
+                resp = self.detect(stack['StackName'])
+            else:
+                if stack['DriftInformation']['LastCheckTimestamp'] < check_threshold:
+                    resp = self.detect(stack['StackName'])
+            if resp:
+                detections.append(resp)
+        return detections
+
+
+    def detect(self,stack_name):
+        # I really wish there was a list drift operations so this was not necessay
+        try:
+            resp = self.cfn_client.detect_stack_drift(StackName=stack_name)
+            return resp['StackDriftDetectionId']
+        except ClientError as e:
+            if 'Drift detection is already in progress for stack' in e.response['Error']['Message']:
+                print(e.response['Error']['Message'])
+            return None
+
+    def wait_for_detection(self):
+        pass
  
 def lambda_handler(event,context):
     dd = DriftDetector(event,context)
-    print(dd.stacks)
-
+    print(dd.detections)
+    #sleep(60)
     return True
 
 
