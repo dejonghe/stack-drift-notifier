@@ -76,16 +76,19 @@ class DriftDetector(object):
             resp = None
             check_threshold = datetime.now(timezone.utc) - timedelta(seconds=last_check_threshold)
             if stack['DriftInformation']['StackDriftStatus'] == 'NOT_CHECKED':
-                resp = self.detect(stack['StackName'])
+                resp = self._detect(stack['StackName'])
             else:
                 if stack['DriftInformation']['LastCheckTimestamp'] < check_threshold:
-                    resp = self.detect(stack['StackName'])
+                    resp = self._detect(stack['StackName'])
             if resp:
                 detections.append(resp)
         return detections
 
 
-    def detect(self,stack_name):
+    def _detect(self,stack_name):
+        '''
+        Private method for making the detect request with exception handling
+        '''
         # I really wish there was a list drift operations so this was not necessay
         try:
             resp = self.cfn_client.detect_stack_drift(StackName=stack_name)
