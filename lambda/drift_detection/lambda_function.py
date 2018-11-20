@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 
 import boto3
+import os
 import re
 from botocore.exceptions import ClientError
 from datetime import datetime, timedelta, timezone
 from time import sleep
+
+from sns_logger import SNSlogger
+
 
 ACTIVE_STACK_STATUS=[
     'CREATE_IN_PROGRESS',
@@ -33,8 +37,19 @@ class DriftDetector(object):
     '''
     stacks = []
 
-    def __init__(self,event,context):
-        session = self._setup_session(context)
+    def __init__(self,profile=None,region=None):
+        self.sns_topic = os.environ.get('sns_topic_id',None)
+        self.sns_subject = os.environ.get('sns_subject',"CFN Drift Detector Report")
+        self.log = SNSlogger(
+                       self.sns_topic, 
+                       self.sns_subject, 
+                       profile=profile,
+                       region=region
+                   )
+        session = boto3.session.Session(
+                      profile_name=context.profile,
+                      region_name=context.region
+                  )
         self.cfn_client = session.client('cloudformation')
         self.stacks = self._get_stacks()
         self.detections = self.check_drift()
@@ -50,22 +65,6 @@ class DriftDetector(object):
             stacks.append(resp['StackSummaries'])
         return stacks
         
-    def _setup_session(self,context):
-        '''
-        Checks to see if running locally by use of test_context
-        If so use profile and region from test_context
-        If not use default session
-        '''
-        if isinstance(context,test_context):
-            # For testing use profile and region from test_context
-            print('Using test_context')
-            print("Profile: {}".format(context.profile))
-            print("Region: {}".format(context.region))
-            self.test = True
-            return boto3.session.Session(profile_name=context.profile,region_name=context.region)
-        else:
-            # Sets up the session in lambda context
-            return boto3.session.Session()
 
     def check_drift(self,last_check_threshold=60):
         '''
@@ -95,14 +94,20 @@ class DriftDetector(object):
             return resp['StackDriftDetectionId']
         except ClientError as e:
             if 'Drift detection is already in progress for stack' in e.response['Error']['Message']:
-                print(e.response['Error']['Message'])
+                self.log.critical(e.response['Error']['Message'])
             return None
 
     def wait_for_detection(self):
         pass
  
 def lambda_handler(event,context):
-    dd = DriftDetector(event,context)
+    if isinstance(context,test_context):
+        profile = context.profile
+        region = context.region 
+    else:
+        profile = None
+        region = None
+    dd = DriftDetector(profile,region)
     print(dd.detections)
     #sleep(60)
     return True
