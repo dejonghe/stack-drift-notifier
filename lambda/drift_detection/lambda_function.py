@@ -40,7 +40,7 @@ class DriftDetector(object):
     def __init__(self,profile=None,region=None):
         self.sns_topic = os.environ.get('sns_topic_id',None)
         self.sns_subject = os.environ.get('sns_subject',"CFN Drift Detector Report")
-        self.log = SNSlogger(
+        self.sns = SNSlogger(
                        self.sns_topic, 
                        self.sns_subject, 
                        profile=profile,
@@ -53,6 +53,9 @@ class DriftDetector(object):
         self.cfn_client = session.client('cloudformation')
         self.stacks = self._get_stacks()
         self.detections = self.check_drift()
+        self.sns.log.info("Detections: {}".format(self.detections))
+        self.wait_for_detection()
+
 
     def _get_stacks(self):
         '''
@@ -88,7 +91,7 @@ class DriftDetector(object):
         '''
         Private method for making the detect request with exception handling
         '''
-        # I really wish there was a list drift operations so this was not necessay
+        # I really wish there was a list drift operations and status so this was not necessay
         try:
             resp = self.cfn_client.detect_stack_drift(StackName=stack_name)
             return resp['StackDriftDetectionId']
@@ -97,8 +100,18 @@ class DriftDetector(object):
                 self.log.critical(e.response['Error']['Message'])
             return None
 
-    def wait_for_detection(self):
-        pass
+    def wait_for_detection(self,backoff=3,max_tries=3):
+        for detection_id in self.detections:
+            try_count = 0
+            detection_status = 'DETECTION_IN_PROGRESS'
+            while detection_status == 'DETECTION_IN_PROGRESS' and try_count <= max_tries:
+                resp = self.cfn_client.describe_stack_drift_detection_status(StackDriftDetectionId=detection_id)
+                detection_status = resp['DetectionStatus']
+                if detection_status == 'DETECTION_IN_PROGRESS':
+                    try_count += 1
+                    sleep(backoff * try_count)
+                   
+                    
  
 def lambda_handler(event,context):
     if isinstance(context,test_context):
@@ -108,7 +121,6 @@ def lambda_handler(event,context):
         profile = None
         region = None
     dd = DriftDetector(profile,region)
-    print(dd.detections)
     #sleep(60)
     return True
 
