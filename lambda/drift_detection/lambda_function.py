@@ -7,6 +7,7 @@ from botocore.exceptions import ClientError
 from datetime import datetime, timedelta, timezone
 from time import sleep
 
+from decorators import retry
 from sns_logger import SNSlogger
 
 
@@ -36,35 +37,36 @@ class DriftDetector(object):
         stacks  List of Stack Objects
     '''
     stacks = []
+    failed_stack_ids = []
 
     def __init__(self,profile=None,region=None):
-        self.sns_topic = os.environ.get('sns_topic_id',None)
-        self.sns_subject = os.environ.get('sns_subject',"CFN Drift Detector Report")
+        print(boto3.__version__)
+        self.sns_topic = os.environ.get('SNS_TOPIC_ID',None)
+        self.sns_subject = os.environ.get('SNS_SUBJECT',"CFN Drift Detector Report")
         self.sns = SNSlogger(
                        self.sns_topic, 
                        self.sns_subject, 
-                       profile=profile,
-                       region=region
+                       profile=profile
                    )
         session = boto3.session.Session(
-                      profile_name=context.profile,
-                      region_name=context.region
+                      profile_name=profile,
+                      region_name=region
                   )
         self.cfn_client = session.client('cloudformation')
-        self.stacks = self._get_stacks()
         self.detections = self.check_drift()
         self.sns.log.info("Detections: {}".format(self.detections))
         self.wait_for_detection()
+        self.report()
 
 
     def _get_stacks(self):
         '''
         Retreives all stacks in region
         '''
-        resp = self.cfn_client.list_stacks(StackStatusFilter=ACTIVE_STACK_STATUS)
+        resp = self._cfn_call('list_stacks',{'StackStatusFilter':ACTIVE_STACK_STATUS})
         stacks = resp['StackSummaries']
         while stacks == None or 'NextToken' in resp.keys():
-            resp = self.cfn_client.list_stacks(NextToken=resp['NextToken'])
+            resp = self._cfn_call('list_stacks',{'NextToken':resp['NextToken']})
             stacks.append(resp['StackSummaries'])
         return stacks
         
@@ -74,10 +76,11 @@ class DriftDetector(object):
         Checks every stack for drift
         '''
         detections = []
-        for stack in self.stacks:
+        for stack in self._get_stacks():
             resp = None
             check_threshold = datetime.now(timezone.utc) - timedelta(seconds=last_check_threshold)
-            if stack['DriftInformation']['StackDriftStatus'] == 'NOT_CHECKED':
+            print('Stack: {}'.format(stack))
+            if stack.get('DriftInformation', {'StackDriftStatus':'NOT_CHECKED'})['StackDriftStatus'] == 'NOT_CHECKED':
                 resp = self._detect(stack['StackName'])
             else:
                 if stack['DriftInformation']['LastCheckTimestamp'] < check_threshold:
@@ -93,7 +96,7 @@ class DriftDetector(object):
         '''
         # I really wish there was a list drift operations and status so this was not necessay
         try:
-            resp = self.cfn_client.detect_stack_drift(StackName=stack_name)
+            resp = self._cfn_call('detect_stack_drift',{'StackName':stack_name})
             return resp['StackDriftDetectionId']
         except ClientError as e:
             if 'Drift detection is already in progress for stack' in e.response['Error']['Message']:
@@ -105,13 +108,42 @@ class DriftDetector(object):
             try_count = 0
             detection_status = 'DETECTION_IN_PROGRESS'
             while detection_status == 'DETECTION_IN_PROGRESS' and try_count <= max_tries:
-                resp = self.cfn_client.describe_stack_drift_detection_status(StackDriftDetectionId=detection_id)
+                print('Checking {}'.format(detection_id))
+                resp = self._cfn_call('describe_stack_drift_detection_status',{'StackDriftDetectionId':detection_id})
                 detection_status = resp['DetectionStatus']
                 if detection_status == 'DETECTION_IN_PROGRESS':
                     try_count += 1
                     sleep(backoff * try_count)
+            if detection_status == 'DETECTION_FAILED':
+                self.sns.log.critical('Detection Failed, StackId: {}, Reason: {}'.format(resp['StackId'],resp['DetectionStatusReason']))
+                self.failed_stack_ids.append(resp['StackId'])
+
+    def report(self):
+        # report_obj = {}
+        for stack in self._get_stacks():
+            if stack['StackId'] not in self.failed_stack_ids:
+                print('Stack result: {}'.format(stack))
+                log_line = 'StackName: {}, DriftStatus: {}, LastCheckTimestamp: {}'.format(
+                    stack['StackName'],
+                    stack['DriftInformation']['StackDriftStatus'],
+                    stack['DriftInformation']['LastCheckTimestamp']
+                )
+                if stack['DriftInformation']['StackDriftStatus'] == 'DRIFTED':
+                    self.sns.log.critical(log_line)
+                else:
+                    self.sns.log.info(log_line)
+
+            #report_obj[stack['StackName']] = {
+            #    'DriftStatus': stack['DriftInformation']['StackDriftStatus'],
+            #    'LastCheckTimestamp': stack['DriftInformation']['LastCheckTimestamp'].isoformat(timespec='minutes')
+            #}
                    
-                    
+    @retry(ClientError)
+    def _cfn_call(self,method,parameters={}):
+        '''
+        Put a retry decorator on any cfn method to avoid rate limit
+        '''
+        return getattr(self.cfn_client,method)(**parameters)
  
 def lambda_handler(event,context):
     if isinstance(context,test_context):
