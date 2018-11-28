@@ -1,5 +1,28 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: CloudFormation Drift Detection
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: 
+          default: Basic Settings
+        Parameters:
+          - Enabled
+          - ScheduleExpression
+      - Label:
+          default:  Notification Settings
+        Parameters:
+          - NotifyEmail
+          - NotificationSubject
+      - Label: 
+          default: Lambda Settings
+        Parameters:
+          - LambdaTimeout
+          - LambdaS3Bucket
+          - LambdaS3Key
+          - Release
+    ParameterLabels:
+      NotifyEmail:
+        default: Email address to send noifications to?
 Parameters:
   LambdaS3Bucket:
     Type: String
@@ -24,7 +47,7 @@ Parameters:
     Default: 300
   NotifyEmail:
     Type: String
-    Description: Email address to notify for detected drift
+    Description: '**REQUIRED** Email address to notify for detected drift.'
     MinLength: 4
     MaxLength: 128
     AllowedPattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,6}$"
@@ -39,7 +62,14 @@ Parameters:
   ScheduleExpression:
     Type: String
     Description: CloudWatch Event Rule Schedule Expression
-    Default: 'rate(1 day)'
+    AllowedValues:
+      - rate(4 hours)
+      - rate(1 day)
+      - rate(2 days)
+      - rate(4 days)
+      - rate(7 days)
+      - rate(14 days)
+    Default: rate(1 day)
     
 Resources:
   LambdaRole:

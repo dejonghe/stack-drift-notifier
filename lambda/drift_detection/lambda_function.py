@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 
 import boto3
+import json
 import os
 import re
 from botocore.exceptions import ClientError
 from datetime import datetime, timedelta, timezone
+from itertools import repeat
+from multiprocessing import Pool
 from time import sleep
 
 from decorators import retry
@@ -28,6 +31,24 @@ ACTIVE_STACK_STATUS=[
     'REVIEW_IN_PROGRESS'
 ]
 
+REGIONS = [
+    'ap-south-1', 
+    'eu-west-3', 
+    'eu-west-2', 
+    'eu-west-1', 
+    'ap-northeast-2', 
+    'ap-northeast-1', 
+    'sa-east-1', 
+    'ca-central-1', 
+    'ap-southeast-1', 
+    'ap-southeast-2', 
+    'eu-central-1', 
+    'us-east-1', 
+    'us-east-2', 
+    'us-west-1', 
+    'us-west-2'
+]
+
 class DriftDetector(object):
     '''
     DriftDetector is a class that runs drift detection
@@ -40,7 +61,6 @@ class DriftDetector(object):
     failed_stack_ids = []
 
     def __init__(self,profile=None,region=None):
-        print(boto3.__version__)
         self.sns_topic = os.environ.get('SNS_TOPIC_ID',None)
         self.sns_subject = os.environ.get('SNS_SUBJECT',"CFN Drift Detector Report")
         self.sns = SNSlogger(
@@ -114,7 +134,8 @@ class DriftDetector(object):
                 if detection_status == 'DETECTION_IN_PROGRESS':
                     try_count += 1
                     sleep(backoff * try_count)
-            if detection_status == 'DETECTION_FAILED':
+            # Detections fail if a resource is not supported but we want to know if there's a failure other than that.
+            if detection_status == 'DETECTION_FAILED' and 'Failed to detect drift on resource' not in resp['DetectionStatusReason']:
                 self.sns.log.critical('Detection Failed, StackId: {}, Reason: {}'.format(resp['StackId'],resp['DetectionStatusReason']))
                 self.failed_stack_ids.append(resp['StackId'])
 
@@ -144,17 +165,20 @@ class DriftDetector(object):
         Put a retry decorator on any cfn method to avoid rate limit
         '''
         return getattr(self.cfn_client,method)(**parameters)
+
+def drift_region(profile,region):
+    dd = DriftDetector(profile,region)
+    return True
  
 def lambda_handler(event,context):
     if isinstance(context,test_context):
         profile = context.profile
-        region = context.region 
+        regions = REGIONS if context.region == 'all' else [context.region]
     else:
         profile = None
-        region = None
-    dd = DriftDetector(profile,region)
-    #sleep(60)
-    return True
+        regions = os.environ.get('REGIONS',REGIONS)
+    with Pool(len(regions)) as p:
+        p.starmap(drift_region,zip(repeat(profile),regions))
 
 
 class test_context(dict):
@@ -166,7 +190,7 @@ class test_context(dict):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Lambda Function that detects CloudFormation drift.')
-    parser.add_argument("-r","--region", help="Region in which to run.", default=None)
+    parser.add_argument("-r","--region", help="Region in which to run. Default: all (will run for all regions)", default='all')
     parser.add_argument("-p","--profile", help="Profile name to use when connecting to aws.", default=None)
 
     args = parser.parse_args()
