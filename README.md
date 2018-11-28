@@ -1,7 +1,7 @@
 # CloudFormation Stack Drift Notifier
 
 ## Overview
-The purpose of this project to setup a lambda that runs on a schedule to detect CloudFormation drift. The lambda runs on a schedule specified by a parameter passed to the CloudFormation stack that sets up the project. 
+The purpose of this project to setup a lambda that runs on a schedule to detect CloudFormation drift. The lambda runs on a schedule specified by a parameter passed to the CloudFormation stack that sets up the project. By default, the lambda will check every region in parallel. A SNS notification is sent to the subscribing email address for every stack that has drifted. 
 
 ## Quick Setup
 I host the lambda and the CloudFormation from a public bucket. You can launch it directly from this button.
