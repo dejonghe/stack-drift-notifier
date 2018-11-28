@@ -5,7 +5,7 @@ The purpose of this project to setup a lambda that runs on a schedule to detect 
 
 ## Quick Setup
 I host the lambda and the CloudFormation from a public bucket. You can launch it directly from this button.
-[![CloudFormation Link](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=stack-drift-notifier&templateURL=https://s3.amazonaws.com/stack-drift-notifier/cloudformation/drift_detection.yaml)
+[![CloudFormation Link](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=stack-drift-notifier&templateURL=https://s3.amazonaws.com/stack-drift-notifier/master/cloudformation/drift_detection.yaml)
 
 ## Manual Set up Drift Detector 
 Before you deploy this CloudFormation template, you need to build the lambda function into a zip and host it on S3. 
