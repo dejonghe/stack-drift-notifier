@@ -1,5 +1,7 @@
 # deployer config
 config/
+# lambda packages
+*.zip
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

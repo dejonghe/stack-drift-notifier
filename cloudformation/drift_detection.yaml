@@ -31,7 +31,7 @@ Parameters:
   LambdaS3Key:
     Type: String
     Description: S3 key path of lambda function zip
-    Default: develop/lambda/drift_detection.zip
+    Default: master/lambda/drift_detection.zip
   Enabled:
     Type: String
     Description: Enabled or Disable Drift Detector
@@ -70,7 +70,11 @@ Parameters:
       - rate(7 days)
       - rate(14 days)
     Default: rate(1 day)
-    
+
+Conditions:
+  PublicBucket: !Equals
+    - !Ref 'LambdaS3Bucket'
+    - "stack-drift-notifier"
 Resources:
   LambdaRole:
     Type: AWS::IAM::Role
@@ -115,7 +119,10 @@ Resources:
       Handler: lambda_function.lambda_handler
       Role: !GetAtt 'LambdaRole.Arn'
       Code:
-        S3Bucket: !Ref 'LambdaS3Bucket'
+        S3Bucket: !If 
+          - PublicBucket
+          - !Sub "${LambdaS3Bucket}-${AWS::Region}"
+          - !Ref 'LambdaS3Bucket'
         S3Key: !Ref 'LambdaS3Key'
       Timeout: !Ref 'LambdaTimeout'
       Runtime: python3.6

@@ -4,8 +4,8 @@
 The purpose of this project to setup a lambda that runs on a schedule to detect CloudFormation drift. The lambda runs on a schedule specified by a parameter passed to the CloudFormation stack that sets up the project. By default, the lambda will check every region in parallel. A SNS notification is sent to the subscribing email address for every stack that has drifted. 
 
 ## Quick Setup
-I host the lambda and the CloudFormation from a public bucket. You can launch it directly from this button.
-[![CloudFormation Link](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=stack-drift-notifier&templateURL=https://s3.amazonaws.com/stack-drift-notifier/master/cloudformation/drift_detection.yaml)
+I host the lambda and the CloudFormation from a public bucket. You can launch it directly from this button. The lambda function package is distributed to a bucket in each region, which means that you can launch this template into any region you wish.
+[![CloudFormation Link](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=Stack-Drift-Notifier&templateURL=https://s3.amazonaws.com/stack-drift-notifier/master/cloudformation/drift_detection.yaml)
 
 ## Manual Set up Drift Detector 
 Before you deploy this CloudFormation template, you need to build the lambda function into a zip and host it on S3. 
