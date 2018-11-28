@@ -42,7 +42,7 @@ This script performs the following tasks:
   * Uses pip to install the requirements to the temp directory
   * Zips up the contents of the temp directory to a package named ./lambda/drift_detection.zip
   * Removes the temp directory
-  * Uploads the zip to `s3://{yourBucket}/{release(develop)}/lambda/drift_detection.zip`
+  * Uploads the zip to `s3://{yourBucket}/{release(master)}/lambda/drift_detection.zip`
 The following is an example of running the script. **Note:** You can pass -p profile, and -r release (Your aws-cli profile's default regions is used)
 ```
 ./bin/env_prep.sh -b drift_detector_{yourUniqueId} (-p optionalProfile -r optionalRelease)

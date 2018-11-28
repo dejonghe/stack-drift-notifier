@@ -19,7 +19,6 @@ Metadata:
           - LambdaTimeout
           - LambdaS3Bucket
           - LambdaS3Key
-          - Release
     ParameterLabels:
       NotifyEmail:
         default: Email address to send noifications to?
@@ -55,10 +54,6 @@ Parameters:
     Type: String
     Description: Subject of the Email notification.
     Default: CFN Drift Detector Report
-  Release:
-    Type: String
-    Description: Version of the solution deployed
-    Default: 0.0.0
   ScheduleExpression:
     Type: String
     Description: CloudWatch Event Rule Schedule Expression

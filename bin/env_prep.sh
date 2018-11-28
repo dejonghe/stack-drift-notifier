@@ -15,7 +15,7 @@ function usage()
   echo "Where valid args are: "
   echo "  -b <bucket> (REQUIRED) -- bucket name to sync to"
   echo "  -p <profile> -- Profile to use for AWS commands, defaults to 'default'"
-  echo "  -r <release> -- Release variable used for bucket path, defaults to 'develop'"
+  echo "  -r <release> -- Release variable used for bucket path, defaults to 'master'"
   exit 1
 }
 
@@ -53,7 +53,7 @@ if [[ "$#" -lt 2 ]] ; then
   usage
 fi
 PROFILE=default
-RELEASE=develop
+RELEASE=master
 while getopts "p:r:b:" opt; do
   case $opt in
     p)
