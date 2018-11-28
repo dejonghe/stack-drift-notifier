@@ -4,6 +4,7 @@ Parameters:
   LambdaS3Bucket:
     Type: String
     Description: Name of S3 bucket containing lambda function zip
+    Default: stack-drift-notifier
   LambdaS3Key:
     Type: String
     Description: S3 key path of lambda function zip
