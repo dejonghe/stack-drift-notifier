@@ -64,7 +64,7 @@ class DriftDetector(object):
         self.sns = SNSlogger(
                        self.sns_topic, 
                        self.sns_subject, 
-                       profile=str(profile)
+                       profile=profile
                    )
         session = boto3.session.Session(
                       profile_name=profile,

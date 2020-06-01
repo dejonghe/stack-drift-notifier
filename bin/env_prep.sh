@@ -30,7 +30,7 @@ function build_lambda()
 
   # Install requirements to temp path
   cd ${temp_path}
-  pip install -r requirements.txt -t .
+  pip3 install -r requirements.txt -t .
 
   # Make a build directory and zip up the build package
   zip -r ../${lambda_pkg_name} ./*

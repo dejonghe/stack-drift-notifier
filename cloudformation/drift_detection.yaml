@@ -98,6 +98,9 @@ Resources:
             Action:
               - cloudformation:*Drift*
               - sns:Publish
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
             Effect: Allow
             Resource: '*'
   SNSTopic:
