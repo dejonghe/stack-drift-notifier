@@ -5,7 +5,7 @@ import re
 class SNSLogHandler(logging.Handler):
     def __init__(self, topic, subject, profile=None):
         logging.Handler.__init__(self)
-        region = re.search('arn:\w+:\w+:(.+?):\d+:.+$', topic).group(1)
+        region = re.search('arn:[a-zA-Z0-9_-]+:\w+:(.+?):\d+:.+$', topic).group(1)
         self.session = boto3.session.Session(profile_name=profile,region_name=region)
         self.sns_client = self.session.client('sns')
         self.topic = topic
@@ -37,9 +37,10 @@ class SNSlogger(object):
         ch.setFormatter(formatter)
         self.log.addHandler(ch)
         self.log.addHandler(hdlr)
-        sns = SNSLogHandler(self.sns_topic, self.sns_subject, self.profile)
+        if self.sns_topic and self.sns_subject:
+            sns = SNSLogHandler(self.sns_topic, self.sns_subject, self.profile)
 
-        # We only want critical messages bothering us via AWS SNS
-        sns.setLevel(logging.CRITICAL)
-        sns.setFormatter(formatter)
-        self.log.addHandler(sns)
+            # We only want critical messages bothering us via AWS SNS
+            sns.setLevel(logging.CRITICAL)
+            sns.setFormatter(formatter)
+            self.log.addHandler(sns)

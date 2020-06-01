@@ -6,8 +6,6 @@ import os
 import re
 from botocore.exceptions import ClientError
 from datetime import datetime, timedelta, timezone
-from itertools import repeat
-from multiprocessing import Pool
 from time import sleep
 
 from decorators import retry
@@ -66,7 +64,7 @@ class DriftDetector(object):
         self.sns = SNSlogger(
                        self.sns_topic, 
                        self.sns_subject, 
-                       profile=profile
+                       profile=str(profile)
                    )
         session = boto3.session.Session(
                       profile_name=profile,
@@ -86,6 +84,7 @@ class DriftDetector(object):
         resp = self._cfn_call('list_stacks',{'StackStatusFilter':ACTIVE_STACK_STATUS})
         stacks = resp['StackSummaries']
         while stacks == None or 'NextToken' in resp.keys():
+            print(resp)
             resp = self._cfn_call('list_stacks',{'NextToken':resp['NextToken']})
             stacks.append(resp['StackSummaries'])
         return stacks
@@ -177,8 +176,8 @@ def lambda_handler(event,context):
     else:
         profile = None
         regions = os.environ.get('REGIONS',REGIONS)
-    with Pool(len(regions)) as p:
-        p.starmap(drift_region,zip(repeat(profile),regions))
+    for region in regions:
+        drift_region(profile, region)
 
 
 class test_context(dict):
